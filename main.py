@@ -50,60 +50,6 @@ def getWord(length = 7):
 
 
 def createHTML(word_data):
-
-    mjml_text = f"""
-    <mjml>
-      <mj-body>
-        <mj-section>
-          <mj-column>
-            <mj-text>
-              <h2>Word: {word_data['word']}</h2>
-              <h3>Pronunciation: {word_data['pronunciation']} ({word_data['phonetic']})</h3>
-              <p><a href="{word_data['audio']}">Audio Pronunciation</a></p>
-            </mj-text>
-            <mj-text>
-              <h4>Origin</h4>
-              <p>{word_data['usages'][0]['origin_summary']}</p>
-              <p><strong>Origin Details:</strong> {word_data['usages'][0]['origin_details']}</p>
-              <p><strong>Earliest Usage:</strong> {word_data['usages'][0]['earliest_usage']}</p>
-            </mj-text>
-            <mj-text>
-              <h4>Etymology</h4>
-              <ul>
-                {''.join([f"<li>{etym['root']}: {etym['meaning']}</li>" for etym in word_data['etymology']['root_words']])}
-              </ul>
-              <p>{word_data['etymology']['linguistic_evolution']}</p>
-            </mj-text>
-            <mj-text>
-                <h4>Examples</h4>
-            """
-
-    #iterate over ages and associated data
-    for age in word_data['explanations']:
-        mjml_text += f"""<h5>Explain it like I'm {age}</h5>
-                            <p><strong>Explanation:</strong> {word_data['explanations'][age]['explanation']}</p>
-                            <strong>Examples</strong>
-                            <ul>"""
-
-        for ex in word_data['explanations'][age]['examples']['short examples']:
-            mjml_text += f"""<li>{ex}</li>"""
-
-        for ex in word_data['explanations'][age]['examples']['long examples']:
-            mjml_text += f"""<li>{ex}</li>"""
-
-        mjml_text += '</ul>'
-
-    mjml_text += f"""</mj-text>
-                    </mj-column>
-                   </mj-section>
-                  </mj-body>
-                 </mjml>"""
-
-    count = 0
-    return mjml_to_html(mjml_template)['html']
-
-
-def test(word_data):
     mjml_text = f"""
     <mjml>
       <mj-body>
@@ -193,15 +139,39 @@ def test(word_data):
     return mjml_to_html(mjml_text)['html']
 
 
+def validateData(word_data):
+
+    expectedKeys = ['word', 'usages', 'etymology', 'pronunciation', 'phonetic', 'audio', 'examples', 'explanations']
+
+    for key in expectedKeys:
+        if key not in word_data:
+            return False
+
+    return True
+
+
+def sendEmail(html):
+    pass
 
 # get word of random length
 wordlength = random.randint(LENGTHLOW, LENGTHHIGH)
-word = getWord(wordlength)
 
-userPrompt = f'{USERPROMPTPREFIX} {word}.  {userPrompt}'
-word_data = queryGPT(userPrompt, SYSTEMPROMPT, OPENAI_API_KEY)
+isValid = False
+
+while isValid == False:
+
+    word = getWord(wordlength)
+
+    userPrompt = f'{USERPROMPTPREFIX} {word}.  {userPrompt}'
+    word_data = queryGPT(userPrompt, SYSTEMPROMPT, OPENAI_API_KEY)
+
+    isValid = validateData(word_data)
+
 
 #html = createHTML(word_data)
-html = test(word_data)
+html = createHTML(word_data)
+
+sendEmail(html)
+
 count = 0
 
