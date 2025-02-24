@@ -2,6 +2,9 @@ import os, requests, json, random
 from openai import OpenAI
 from mjml import mjml_to_html
 from dotenv import load_dotenv
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 
 load_dotenv('vocabber.env')
@@ -11,7 +14,10 @@ USERPROMPTPREFIX = os.getenv("USERPROMPTPREFIX")
 userPrompt = os.getenv("USERPROMPT2")
 LENGTHLOW = int(os.getenv("LENGTHLOW"))
 LENGTHHIGH = int(os.getenv("LENGTHHIGH"))
-
+recipient_email = "dustin0357@outlook.com"
+EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+RECIPIANT_EMAILS = os.getenv("RECIPIANT_EMAILS").split(",")
 
 def queryGPT(userPrompt, systemPrompt, OPENAI_API_KEY):
 
@@ -102,6 +108,9 @@ def createHTML(word_data):
 
     # Add explanations for different age groups
     for age in word_data['explanations']:
+        if age in ['another AI', 'a professional businessman']:
+            continue
+
         mjml_text += f"""<h3>Explain it like I'm {age}</h3>
                             <p><strong>Explanation:</strong> {word_data['explanations'][age]['explanation']}</p>
                             <strong>Examples:</strong>
@@ -115,7 +124,7 @@ def createHTML(word_data):
         for ex in word_data['explanations'][age]['examples']['long examples']:
             mjml_text += f"""<li>{ex}</li>"""
 
-        mjml_text += '</ul></hr>'
+        mjml_text += '</ul><br><mj-divider border-color="#FF8CFF">'
 
     mjml_text += f"""
             </mj-text>
@@ -150,8 +159,30 @@ def validateData(word_data):
     return True
 
 
-def sendEmail(html):
-    pass
+def sendEmail(html, recipiant_email):
+
+
+    SMTP_SERVER = "smtp.titan.email"
+    SMTP_PORT = 587  # Use 465 for SSL
+    subject = "Vocabber word of the day"
+
+    # Create the email
+    msg = MIMEMultipart()
+    msg["From"] = EMAIL_ADDRESS
+    msg["To"] = recipient_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html, "html"))
+
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()  # Upgrade the connection to secure
+        server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_ADDRESS, recipient_email, msg.as_string())
+        server.quit()
+        print("Email sent successfully!")
+    except Exception as e:
+        print(f"Error: {e}")
+
 
 # get word of random length
 wordlength = random.randint(LENGTHLOW, LENGTHHIGH)
@@ -168,10 +199,7 @@ while isValid == False:
     isValid = validateData(word_data)
 
 
-#html = createHTML(word_data)
 html = createHTML(word_data)
 
-sendEmail(html)
-
-count = 0
-
+for recipient_email in RECIPIANT_EMAILS:
+    sendEmail(html, recipient_email)
