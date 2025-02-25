@@ -11,7 +11,7 @@ load_dotenv('vocabber.env')
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SYSTEMPROMPT = os.getenv("SYSTEMPROMPT")
 USERPROMPTPREFIX = os.getenv("USERPROMPTPREFIX")
-userPrompt = os.getenv("USERPROMPT2")
+userPrompt = os.getenv("USERPROMPT")
 LENGTHLOW = int(os.getenv("LENGTHLOW"))
 LENGTHHIGH = int(os.getenv("LENGTHHIGH"))
 recipient_email = "dustin0357@outlook.com"
@@ -24,23 +24,26 @@ def queryGPT(userPrompt, systemPrompt, OPENAI_API_KEY):
     client = OpenAI(
         api_key=OPENAI_API_KEY  # This is the default and can be omitted
     )
+    print("Calling ChatGPT")
 
     response = client.chat.completions.create(
+        response_format={"type": "json_object"},
+        model="gpt-4o-mini",
         messages=[
-            {
-                "role": "user",
-                "content": userPrompt
-            },
             {
                 "role": "system",
                 "content": systemPrompt
+            },
+            {
+                "role": "user",
+                "content": userPrompt
             }
-        ],
-        model="gpt-4o-mini",
+        ]
     )
 
     response_text = response.choices[0].message.content
-    response_text = json.loads(response_text.strip()[7:-3])
+    #response_text = json.loads(response_text.strip()[7:-3])
+    response_text = json.loads(response_text)
 
     return response_text
 
@@ -60,36 +63,33 @@ def createHTML(word_data):
     <mjml>
       <mj-body>
         <!-- Header Section -->
-        <mj-section background-color="#FF8CFF">
-          <mj-column>
-            <mj-text align="center" font-size="24px" color="#ffffff" font-family="Arial, sans-serif">
-              <h1>Discover the Word: {word_data['word']}</h1>
-            </mj-text>
-          </mj-column>
+        <mj-section full-width="full-width" background-color="#ffffff" padding-bottom="0">
+            <mj-column width="100%">
+                <mj-image src="https://res.cloudinary.com/ddnbf9prg/image/upload/c_crop,w_800,h_500/v1740488213/header_vocabber5_d7yexe.png" alt=""/>
+                <mj-text font-size="28px" font-weight="normal" color="#333333" align="center" padding="20px 0" letter-spacing="1px" line-height="1.5" text-transform="uppercase">Word of the Day</mj-text>
+                <mj-text font-size="40px" font-weight="bold" color="#444444" align="center" padding="20px 0" letter-spacing="1px" line-height="1.5" text-transform="uppercase">{word_data['word']}</mj-text>
+            </mj-column>
         </mj-section>
-
         <!-- Main Content Section -->
         <mj-section padding="20px" background-color="#ffffff">
           <mj-column>
-            <mj-text font-size="18px" font-family="Arial, sans-serif" color="#333333">
-              <h2>Pronunciation:</h2>
-              <h3>{word_data['pronunciation']} ({word_data['phonetic']})</h3>
-              <p><a href="{word_data['audio']}" style="color: #FF8CFF;">Listen to the Pronunciation</a></p>
+            <mj-text>
+                <h3>Pronunciation:</h3>
+                <h3>{word_data['pronunciation']} ({word_data['phonetic']})</h3>
             </mj-text>
-
             <!-- Origin Section -->
-            <mj-divider border-color="#FF8CFF" />
+            <mj-divider border-color="#4361ee" />
             <mj-text font-size="18px" font-family="Arial, sans-serif" color="#333333">
-              <h4>Origin</h4>
+              <h4 align="center">Origin</h4>
               <p>{word_data['usages'][0]['origin_summary']}</p>
               <p><strong>Origin Details:</strong> {word_data['usages'][0]['origin_details']}</p>
               <p><strong>Earliest Usage:</strong> {word_data['usages'][0]['earliest_usage']}</p>
             </mj-text>
 
             <!-- Etymology Section -->
-            <mj-divider border-color="#FF8CFF" />
+            <mj-divider border-color="#4361ee" />
             <mj-text font-size="18px" font-family="Arial, sans-serif" color="#333333">
-              <h4>Etymology</h4>
+              <h4 align="center">Etymology</h4>
               <h5>Root Words</h5>
               <ul style="padding-left: 20px;">
               """
@@ -101,20 +101,19 @@ def createHTML(word_data):
                      <p>{word_data['etymology']['linguistic_evolution']}</p>
                     </mj-text>
             <!-- Explanation by Age Section -->
-            <mj-divider border-color="#FF8CFF" />
+            <mj-divider border-color="#4361ee" />
             <mj-text font-size="18px" font-family="Arial, sans-serif" color="#333333">
-                <h4>Examples</h4>
+                <h4 align="center">Examples</h4></mj-text>
             """
 
     # Add explanations for different age groups
     for age in word_data['explanations']:
-        if age in ['another AI', 'a professional businessman']:
-            continue
 
-        mjml_text += f"""<h3>Explain it like I'm {age}</h3>
-                            <p><strong>Explanation:</strong> {word_data['explanations'][age]['explanation']}</p>
-                            <strong>Examples:</strong>
-                            <ul style="padding-left: 20px;">"""
+        mjml_text += f"""<mj-text>
+        <h3>Explain it like I'm {age}</h3>
+        <p><strong>Explanation:</strong> {word_data['explanations'][age]['explanation']}</p>
+        <strong>Examples:</strong>
+        <ul style="padding-left: 20px;">"""
 
         # Add short examples
         for ex in word_data['explanations'][age]['examples']['short examples']:
@@ -124,10 +123,9 @@ def createHTML(word_data):
         for ex in word_data['explanations'][age]['examples']['long examples']:
             mjml_text += f"""<li>{ex}</li>"""
 
-        mjml_text += '</ul><br><mj-divider border-color="#FF8CFF">'
+        mjml_text += '</ul></mj-text><mj-divider border-color="#4361ee" />'
 
     mjml_text += f"""
-            </mj-text>
           </mj-column>
         </mj-section>
 
@@ -144,13 +142,12 @@ def createHTML(word_data):
     </mjml>
     """
 
-    count = 0
     return mjml_to_html(mjml_text)['html']
 
 
 def validateData(word_data):
 
-    expectedKeys = ['word', 'usages', 'etymology', 'pronunciation', 'phonetic', 'audio', 'examples', 'explanations']
+    expectedKeys = ['word', 'usages', 'etymology', 'pronunciation', 'phonetic', 'examples', 'explanations']
 
     for key in expectedKeys:
         if key not in word_data:
@@ -187,17 +184,21 @@ def sendEmail(html, recipiant_email):
 # get word of random length
 wordlength = random.randint(LENGTHLOW, LENGTHHIGH)
 
-isValid = False
+#isValid = False
 
-while isValid == False:
+#while isValid == False:
 
-    word = getWord(wordlength)
+word = getWord(wordlength)
 
-    userPrompt = f'{USERPROMPTPREFIX} {word}.  {userPrompt}'
-    word_data = queryGPT(userPrompt, SYSTEMPROMPT, OPENAI_API_KEY)
+userPrompt = f'{USERPROMPTPREFIX} {word}.  {userPrompt}'
+word_data = queryGPT(userPrompt, SYSTEMPROMPT, OPENAI_API_KEY)
 
-    isValid = validateData(word_data)
+#    isValid = validateData(word_data)
 
+#ensure value exists
+word_data['usages'][0]['earliest_usage'] = word_data.get('usages', [{}])[0].get('earliest_usage', 'Unknown')
+word_data['pronunciation'] = word_data.get('pronunciation', 'Unknown')
+word_data['phonetic'] = word_data.get('phonetic', 'Unknown')
 
 html = createHTML(word_data)
 
