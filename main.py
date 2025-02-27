@@ -7,13 +7,14 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
-load_dotenv('vocabber.env')
+load_dotenv('/vocabber/vocabber.env')
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SYSTEMPROMPT = os.getenv("SYSTEMPROMPT")
 USERPROMPTPREFIX = os.getenv("USERPROMPTPREFIX")
 userPrompt = os.getenv("USERPROMPT")
-LENGTHLOW = int(os.getenv("LENGTHLOW"))
-LENGTHHIGH = int(os.getenv("LENGTHHIGH"))
+LENGTHLOW = int(os.getenv("LENGTHLOW", '5'))
+LENGTHHIGH = int(os.getenv("LENGTHHIGH", '11'))
 recipient_email = "dustin0357@outlook.com"
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
@@ -42,7 +43,6 @@ def queryGPT(userPrompt, systemPrompt, OPENAI_API_KEY):
     )
 
     response_text = response.choices[0].message.content
-    #response_text = json.loads(response_text.strip()[7:-3])
     response_text = json.loads(response_text)
 
     return response_text
@@ -184,21 +184,22 @@ def sendEmail(html, recipiant_email):
 # get word of random length
 wordlength = random.randint(LENGTHLOW, LENGTHHIGH)
 
-#isValid = False
-
-#while isValid == False:
-
 word = getWord(wordlength)
 
 userPrompt = f'{USERPROMPTPREFIX} {word}.  {userPrompt}'
 word_data = queryGPT(userPrompt, SYSTEMPROMPT, OPENAI_API_KEY)
 
-#    isValid = validateData(word_data)
-
+"""
 #ensure value exists
-word_data['usages'][0]['earliest_usage'] = word_data.get('usages', [{}])[0].get('earliest_usage', 'Unknown')
+try:
+    if len(word_data['earliest_usage']) != 4:
+        word_data['earliest_usage'] = 'Unknown'
+except:
+    word_data['earliest_usage'] = 'Unknown'
+
 word_data['pronunciation'] = word_data.get('pronunciation', 'Unknown')
 word_data['phonetic'] = word_data.get('phonetic', 'Unknown')
+"""
 
 html = createHTML(word_data)
 
