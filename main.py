@@ -1,8 +1,8 @@
-import os, requests, json, random
+import os, requests, json, random, urllib3
 from openai import OpenAI
 from mjml import mjml_to_html
 from dotenv import load_dotenv
-import smtplib
+import smtplib, clickhouse_connect
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -15,10 +15,37 @@ USERPROMPTPREFIX = os.getenv("USERPROMPTPREFIX")
 userPrompt = os.getenv("USERPROMPT")
 LENGTHLOW = int(os.getenv("LENGTHLOW", '5'))
 LENGTHHIGH = int(os.getenv("LENGTHHIGH", '11'))
-recipient_email = "dustin0357@outlook.com"
+
+DBHOST = os.getenv("DBHOST")
+DBUSER = os.getenv("DBUSER")
+DBPASS = os.getenv("DBPASS")
+DBTABLEWORD = os.getenv("DBTABLEWORD")
+DBTABLEDATA = os.getenv("DBTABLEDATA")
+
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 RECIPIANT_EMAILS = os.getenv("RECIPIANT_EMAILS").split(",")
+
+
+def getClickSession():
+
+    try:
+        # Set up Session() to not show warnings/errors for the self-signed cert
+        clickSession = requests.Session()
+        clickSession.verify = False
+        urllib3.disable_warnings()
+        clickSession.headers.update({
+            "accept": "application/json, text/plain",
+            "X-Requested-With": "required"
+            })
+        #logging.debug(f'{logWorkload} : Establish Clickhouse session - Success')
+
+    except Exception as e:
+        #logging.error(f'{logWorkload} : Establish Clickhouse session - Failed: {e}')
+        pass
+
+    return clickSession
+
 
 def queryGPT(userPrompt, systemPrompt, OPENAI_API_KEY):
 
@@ -48,14 +75,12 @@ def queryGPT(userPrompt, systemPrompt, OPENAI_API_KEY):
     return response_text
 
 
-def getWord(length = 7):
-    url = f'https://random-word-api.herokuapp.com/word?length={length}'
-    response = requests.get(url)
+def getWord(DBTABLEWORD):
 
-    #convert from string to list
-    word = json.loads(response.text)[0]
-
-    return word
+    query = f"SELECT * FROM {DBTABLEWORD} ORDER BY rand() LIMIT 1"
+    result = clickClient.command(query)
+    randomWord = result[1]
+    return randomWord
 
 
 def createHTML(word_data):
@@ -181,10 +206,11 @@ def sendEmail(html, recipiant_email):
         print(f"Error: {e}")
 
 
-# get word of random length
-wordlength = random.randint(LENGTHLOW, LENGTHHIGH)
+# Connect to ClickHouse
+clickClient = clickhouse_connect.get_client(host=DBHOST, port=8123, user=DBUSER, password=DBPASS)
+clickSession = getClickSession()
 
-word = getWord(wordlength)
+word = getWord(DBTABLEWORD)
 
 userPrompt = f'{USERPROMPTPREFIX} {word}.  {userPrompt}'
 word_data = queryGPT(userPrompt, SYSTEMPROMPT, OPENAI_API_KEY)
