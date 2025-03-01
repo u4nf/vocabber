@@ -13,8 +13,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 SYSTEMPROMPT = os.getenv("SYSTEMPROMPT")
 USERPROMPTPREFIX = os.getenv("USERPROMPTPREFIX")
 userPrompt = os.getenv("USERPROMPT")
-LENGTHLOW = int(os.getenv("LENGTHLOW", '5'))
-LENGTHHIGH = int(os.getenv("LENGTHHIGH", '11'))
 
 DBHOST = os.getenv("DBHOST")
 DBUSER = os.getenv("DBUSER")
@@ -77,10 +75,43 @@ def queryGPT(userPrompt, systemPrompt, OPENAI_API_KEY):
 
 def getWord(DBTABLEWORD):
 
-    query = f"SELECT * FROM {DBTABLEWORD} ORDER BY rand() LIMIT 1"
+    #Select unused word
+    query = f"SELECT * FROM {DBTABLEWORD} WHERE used IS NULL ORDER BY rand() LIMIT 1"
     result = clickClient.command(query)
     randomWord = result[1]
+
+    #flag word as used
+    updateQuery = f"ALTER TABLE vocabber.words_21 UPDATE used = toUnixTimestamp(now()) WHERE word = '{randomWord}'";
+    update = clickClient.command(updateQuery)
+
     return randomWord
+
+
+def PushToDB(word_data):
+
+    def escape_sql_value(value):
+        """Converts a value to a string and escapes single quotes for safe SQL insertion."""
+        if isinstance(value, (dict, list)):  # Convert lists/dicts to JSON strings
+            value = json.dumps(value, ensure_ascii=False)
+        return str(value).replace("'", r"\'")  # Escape single quotes
+
+    # Extract and escape all fields
+    word = escape_sql_value(word_data.get("word", ""))
+    phonetic = escape_sql_value(word_data.get("phonetic", ""))
+    pronunciation = escape_sql_value(word_data.get("pronunciation", "")).replace("/", "").replace("'", "")
+    linguistic_evolution = escape_sql_value(word_data.get("etymology", {}).get("linguistic_evolution", ""))
+    root_words = escape_sql_value(word_data.get("etymology", {}).get("root_words", []))
+    explanations = escape_sql_value(word_data.get("explanations", {}))
+    usages = escape_sql_value(word_data.get("usages", []))
+
+    insertion_string = f"""
+    ('{word}', '{phonetic}', '{pronunciation}', '{linguistic_evolution}', '{root_words}', '{explanations}', '{usages}')
+    """
+
+    # Execute the Insert Command
+    query = f'INSERT INTO {DBTABLEDATA} VALUES {insertion_string}'
+    print(query)
+    clickClient.command(query)
 
 
 def createHTML(word_data):
@@ -155,7 +186,7 @@ def createHTML(word_data):
         </mj-section>
 
         <!-- Footer Section -->
-        <mj-section background-color="#FF8CFF" padding="20px">
+        <mj-section padding="20px">
           <mj-column>
             <mj-text align="center" color="#ffffff" font-size="14px" font-family="Arial, sans-serif">
               <p>Learn more words and expand your knowledge every day!</p>
@@ -170,21 +201,10 @@ def createHTML(word_data):
     return mjml_to_html(mjml_text)['html']
 
 
-def validateData(word_data):
-
-    expectedKeys = ['word', 'usages', 'etymology', 'pronunciation', 'phonetic', 'examples', 'explanations']
-
-    for key in expectedKeys:
-        if key not in word_data:
-            return False
-
-    return True
-
-
 def sendEmail(html, recipiant_email):
 
 
-    SMTP_SERVER = "smtp.titan.email"
+    SMTP_SERVER = "smtp.ionos.com"
     SMTP_PORT = 587  # Use 465 for SSL
     subject = "Vocabber word of the day"
 
@@ -193,6 +213,8 @@ def sendEmail(html, recipiant_email):
     msg["From"] = EMAIL_ADDRESS
     msg["To"] = recipient_email
     msg["Subject"] = subject
+    spoofedFrom = 'wordoftheday@vocabber.com'
+
     msg.attach(MIMEText(html, "html"))
 
     try:
@@ -200,6 +222,7 @@ def sendEmail(html, recipiant_email):
         server.starttls()  # Upgrade the connection to secure
         server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
         server.sendmail(EMAIL_ADDRESS, recipient_email, msg.as_string())
+        #server.sendmail(spoofedFrom, recipient_email, msg.as_string())
         server.quit()
         print("Email sent successfully!")
     except Exception as e:
@@ -214,20 +237,11 @@ word = getWord(DBTABLEWORD)
 
 userPrompt = f'{USERPROMPTPREFIX} {word}.  {userPrompt}'
 word_data = queryGPT(userPrompt, SYSTEMPROMPT, OPENAI_API_KEY)
-
-"""
-#ensure value exists
-try:
-    if len(word_data['earliest_usage']) != 4:
-        word_data['earliest_usage'] = 'Unknown'
-except:
-    word_data['earliest_usage'] = 'Unknown'
-
-word_data['pronunciation'] = word_data.get('pronunciation', 'Unknown')
-word_data['phonetic'] = word_data.get('phonetic', 'Unknown')
-"""
+#PushToDB(word_data)
 
 html = createHTML(word_data)
 
 for recipient_email in RECIPIANT_EMAILS:
     sendEmail(html, recipient_email)
+
+exit(0)
