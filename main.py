@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import smtplib, clickhouse_connect
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-
+from email.utils import formataddr
 
 load_dotenv('/vocabber/vocabber.env')
 
@@ -121,7 +121,7 @@ def createHTML(word_data):
         <!-- Header Section -->
         <mj-section full-width="full-width" background-color="#ffffff" padding-bottom="0">
             <mj-column width="100%">
-                <mj-image src="https://res.cloudinary.com/ddnbf9prg/image/upload/c_crop,w_800,h_500/v1740488213/header_vocabber5_d7yexe.png" alt=""/>
+                <mj-image href="https://vocabber.com" src="https://res.cloudinary.com/ddnbf9prg/image/upload/v1742023565/header_vocabber5_white_outline_jasujd.png" alt=""/>
                 <mj-text font-size="28px" font-weight="normal" color="#333333" align="center" padding="20px 0" letter-spacing="1px" line-height="1.5" text-transform="uppercase">Word of the Day</mj-text>
                 <mj-text font-size="40px" font-weight="bold" color="#444444" align="center" padding="20px 0" letter-spacing="1px" line-height="1.5" text-transform="uppercase">{word_data['word']}</mj-text>
             </mj-column>
@@ -143,7 +143,6 @@ def createHTML(word_data):
             </mj-text>
 
             <!-- Etymology Section -->
-            <mj-divider border-color="#4361ee" />
             <mj-text font-size="18px" font-family="Arial, sans-serif" color="#333333">
               <h4 align="center">Etymology</h4>
               <h5>Root Words</h5>
@@ -157,7 +156,6 @@ def createHTML(word_data):
                      <p>{word_data['etymology']['linguistic_evolution']}</p>
                     </mj-text>
             <!-- Explanation by Age Section -->
-            <mj-divider border-color="#4361ee" />
             <mj-text font-size="18px" font-family="Arial, sans-serif" color="#333333">
                 <h4 align="center">Examples</h4></mj-text>
             """
@@ -167,8 +165,9 @@ def createHTML(word_data):
 
         mjml_text += f"""<mj-text>
         <h3>Explain it like I'm {age}</h3>
-        <p><strong>Explanation:</strong> {word_data['explanations'][age]['explanation']}</p>
-        <strong>Examples:</strong>
+        <h4>Explanation:</h4>
+        <p>{word_data['explanations'][age]['explanation']}</p>
+        <h4>Examples:</h4>
         <ul style="padding-left: 20px;">"""
 
         # Add short examples
@@ -188,9 +187,9 @@ def createHTML(word_data):
         <!-- Footer Section -->
         <mj-section padding="20px">
           <mj-column>
-            <mj-text align="center" color="#ffffff" font-size="14px" font-family="Arial, sans-serif">
+            <mj-text align="center" font-size="14px" font-family="Arial, sans-serif">
               <p>Learn more words and expand your knowledge every day!</p>
-              <p>&copy; "Vocabber - Made for Zara ❤️"</p>
+              <p>&copy; "<a href="https://vocabber.com">Vocabber.com</a> - Made for Zara ❤️"</p>
             </mj-text>
           </mj-column>
         </mj-section>
@@ -210,7 +209,7 @@ def sendEmail(html, recipiant_email):
 
     # Create the email
     msg = MIMEMultipart()
-    msg["From"] = EMAIL_ADDRESS
+    msg["From"] = formataddr(('Vocabber', EMAIL_ADDRESS))
     msg["To"] = recipient_email
     msg["Subject"] = subject
     spoofedFrom = 'wordoftheday@vocabber.com'
